@@ -18,6 +18,11 @@ class NamedCapture:
     registration_id: str
     version: str
     readings: tuple[FixedReading, ...]
+    event_id: str | None = None
+
+    @property
+    def is_retest(self) -> bool:
+        return self.event_id is not None
 
 
 def read_capture_evidence(db: sqlite3.Connection, receipt: str) -> tuple[NamedCapture, bytes]:
@@ -31,7 +36,16 @@ def read_capture_evidence(db: sqlite3.Connection, receipt: str) -> tuple[NamedCa
             raise EvidenceMismatch(f'invalid frozen reading for {receipt}') from error
         original = load_original(db, receipt)
         verify_capture_seal(record, readings, original)
-        return NamedCapture(record.receipt, record.registration_id, record.version, readings), original
+        return (
+            NamedCapture(
+                record.receipt,
+                record.registration_id,
+                record.version,
+                readings,
+                record.event_id,
+            ),
+            original,
+        )
 
 
 def get_capture(db: sqlite3.Connection, receipt: str) -> NamedCapture:

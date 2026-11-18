@@ -26,7 +26,7 @@ def _reject_non_json_number(token: str) -> None:
     raise BadRecording(f'invalid JSON number: {token}')
 
 
-def decode_named_recording(raw: bytes) -> NamedRecording:
+def load_recording_object(raw: bytes) -> dict:
     if not isinstance(raw, bytes):
         raise BadRecording('original recording must be bytes')
     try:
@@ -41,10 +41,17 @@ def decode_named_recording(raw: bytes) -> NamedRecording:
         raise BadRecording('original recording must be valid UTF-8 JSON') from error
     if not isinstance(recording, dict):
         raise BadRecording('recording must be an object')
+    return recording
 
+
+def read_batch_id(recording: dict) -> str:
     batch_id = recording.get('batch_id')
     if not isinstance(batch_id, str) or not batch_id.strip():
         raise BadRecording('recording batch_id must be a nonempty string')
+    return batch_id
+
+
+def read_source_scale(recording: dict) -> tuple[int, int]:
     source_scale = recording.get('source_scale')
     if (
         not isinstance(source_scale, list)
@@ -52,7 +59,14 @@ def decode_named_recording(raw: bytes) -> NamedRecording:
         or any(type(part) is not int for part in source_scale)
     ):
         raise BadRecording('source_scale must contain two integers')
+    return source_scale[0], source_scale[1]
 
+
+def decode_named_recording(raw: bytes) -> NamedRecording:
+    recording = load_recording_object(raw)
     return NamedRecording(
-        batch_id, (source_scale[0], source_scale[1]), decode_named_pages(recording.get('pages')), raw
+        read_batch_id(recording),
+        read_source_scale(recording),
+        decode_named_pages(recording.get('pages')),
+        raw,
     )

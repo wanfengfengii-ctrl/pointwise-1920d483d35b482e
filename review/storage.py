@@ -2,7 +2,8 @@ import json
 import sqlite3
 
 from archive.database import BeforeCommit, archive_write
-from review.report import ReviewReport, SpecimenVerdict
+from portal.evidence import SourceLocation
+from review.report import ReviewReport, SpecimenVerdict, Witness
 
 
 class UnknownReport(KeyError):
@@ -25,6 +26,13 @@ def init_report_store(db: sqlite3.Connection) -> None:
     ''')
 
 
+def _witness_rows(witnesses: tuple[Witness, ...]) -> list[list[object]]:
+    return [
+        [item.specimen_id, item.event_id, item.receipt, *item.location.as_key()]
+        for item in witnesses
+    ]
+
+
 def save_report(
     db: sqlite3.Connection, report: ReviewReport, *, before_commit: BeforeCommit | None = None
 ) -> None:
@@ -34,6 +42,7 @@ def save_report(
             for row in report.verdicts
         ],
         'over_limit': report.over_limit,
+        'witnesses': _witness_rows(report.witnesses),
     })
     with archive_write(db, before_commit=before_commit):
         db.execute(
@@ -43,6 +52,19 @@ def save_report(
         )
 
 
+def _decode_snapshot(snapshot: str) -> tuple[tuple[SpecimenVerdict, ...], tuple[str, ...], tuple[Witness, ...]]:
+    saved = json.loads(snapshot)
+    verdicts = tuple(
+        SpecimenVerdict(specimen, int(value, 16), int(limit, 16), passed)
+        for specimen, value, limit, passed in saved['verdicts']
+    )
+    witnesses = tuple(
+        Witness(specimen, event_id, receipt, SourceLocation(page_id, row_number))
+        for specimen, event_id, receipt, page_id, row_number in saved.get('witnesses', ())
+    )
+    return verdicts, tuple(saved['over_limit']), witnesses
+
+
 def load_report(db: sqlite3.Connection, report_id: str) -> ReviewReport:
     row = db.execute(
         f'SELECT {_FIELDS} FROM review_reports WHERE report_id = ?', (report_id,)
@@ -50,11 +72,7 @@ def load_report(db: sqlite3.Connection, report_id: str) -> ReviewReport:
     if row is None:
         raise UnknownReport(report_id)
     fixed_id, receipt, registration_id, batch_id, version, snapshot = row
-    saved = json.loads(snapshot)
-    verdicts = tuple(
-        SpecimenVerdict(specimen, int(value, 16), int(limit, 16), passed)
-        for specimen, value, limit, passed in saved['verdicts']
-    )
+    verdicts, over_limit, witnesses = _decode_snapshot(snapshot)
     return ReviewReport(
-        fixed_id, receipt, registration_id, batch_id, version, verdicts, tuple(saved['over_limit'])
+        fixed_id, receipt, registration_id, batch_id, version, verdicts, over_limit, witnesses
     )

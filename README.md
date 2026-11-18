@@ -21,9 +21,11 @@ python3 -B -m demo
 | `runs.registry.get_roster(db, registration_id)` | 固定清册及登记号 |
 | `portal.source.RecordedPortal({batch_id: path}).fetch_recording(batch_id)` | 本地模拟门户的原件字节 |
 | `intake.accept.import_named(db, registration_id, raw)` | 已发布的采集回执 |
+| `intake.accept.import_retest(db, registration_id, raw)` | 已发布的复测回执 |
 | `archive.readings.get_capture(db, receipt)` | 已核验的登记绑定与有序读数 |
 | `archive.readings.read_capture_evidence(db, receipt)` | `(capture, original_bytes)`，二者一起核验 |
 | `review.issue.issue_review(db, receipt)` | 已提交的 `ReviewReport`，含 `report_id` |
+| `review.issue.issue_witnessed(db, primary_receipt, candidate_receipts)` | 已提交的复测报告，或无解时的 `None` |
 | `review.issue.get_report(db, report_id)` | 指定报告号固定的签发快照 |
 
 `specimens` 是非空的有序试片号序列。`limits` 以试片号为键，恰好为每片提供一个整数上限。`scale` 接受整数分子与分母组成的二元序列，或 `Fraction`，比值必须为正。清册保留原顺序。重登同版相同内容沿用原登记号，同版改变顺序或内容会发生冲突。登记新版本后，旧版仍可引用。
@@ -32,4 +34,16 @@ python3 -B -m demo
 
 回执与原件一同发布。同登记号下提交相同原件字节会沿用已有回执。两份不同且有效的录制各自固定。按回执领取时验证原件、登记绑定和有序读数。签发按该回执对应版本的逐片上限复核，等于上限时通过。报告中保留原回执、登记号、版本、有序裁决和越限项。需要追溯时，用报告的回执读取已核验原件，在指定页的原始行号查找。
 
-无效输入和同版冲突抛出 `ValueError` 的子类。未知登记、回执或报告抛出 `KeyError` 的子类。固定证据缺失或不一致抛出 `EvidenceMismatch`。来源停用或文件读取失败抛出 `OSError` 的子类。SQLite 错误向调用方传播，未提交的写入回滚。`import_named` 和 `issue_review` 接受可选的 `before_commit(db)` 回调，用于受控验证提交失败；回调在新写入完成后、事务提交前执行，不能结束事务。
+无效输入和同版冲突抛出 `ValueError` 的子类。未知登记、回执或报告抛出 `KeyError` 的子类。固定证据缺失或不一致抛出 `EvidenceMismatch`。来源停用或文件读取失败抛出 `OSError` 的子类。SQLite 错误向调用方传播，未提交的写入回滚。`import_named`、`import_retest`、`issue_review` 和 `issue_witnessed` 接受可选的 `before_commit(db)` 回调，用于受控验证提交失败；回调在新写入完成后、事务提交前执行，不能结束事务。
+
+## 具名复测见证
+
+`import_retest` 接纳在原录制顶层增加 `event_id` 的 UTF-8 JSON 原件。`event_id` 是可编码为 UTF-8 的非空白字符串，按原文精确比较，在同一登记号内表示同一次现场采集。每片必须属于清册、每片至多一行、至少一片，其余批号、页结构、原行号和精确整数换算规则与 V1 相同。
+
+同一事件的多份导出可以互补：先接纳的规范值成为该事件的冻结值，后续导出只补充新试片；任一重叠试片的规范值不同则整份拒绝，不留下部分写入。按换算后的整数比较，源刻度、页号、列顺序和行位置可以不同，因此同一事件的另一页布局或另一源刻度仍可接纳。同登记号下相同原件字节重投返回同一复测回执；其他兼容原件各有回执。V1 回执与复测回执的重投范围彼此独立，经由 `import_named` 接纳的、含 `event_id` 的原件仍只是 V1 回执，没有复测资格。
+
+`get_capture` 与 `read_capture_evidence` 同时支持两类回执。复测 capture 额外提供 `event_id`，其余字段沿用，读数只含该份原件覆盖的试片，按清册相对顺序排列。核验内容为事件身份、原件字节与冻结读数，任一损坏或缺失抛 `EvidenceMismatch`。
+
+`issue_witnessed` 要求主回执是覆盖完整清册的复测回执。候选序列可为空或含重复项，重复与仅指定一次等效；全部指定回执须固定在同一登记号下，任一为 V1 回执则拒绝。主事件的候选没有见证资格。签发为每片选一条来自另一个事件、且与主读数等值的实际原行；每个事件至多见证一片，因此同一事件的多份互补导出合起来仍只占一个名额。任一完整分配均可签发，无解返回 `None` 且不落任何报告。成功报告保留原有裁决字段，并以清册顺序给出 `witnesses`，每项含 `specimen_id`、`event_id`、实际采用的候选 `receipt` 和 `SourceLocation`。
+
+`get_report` 对见证报告重新核对固定主回执与每个已选证据；不得改选、补行或用新原件替换。后续接纳的新导出不会改变既有报告，重开归档后按报告号仍能逐项领取原分配。旧报告继续按 V1 口径领取。

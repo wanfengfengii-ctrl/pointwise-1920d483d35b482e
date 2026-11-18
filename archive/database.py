@@ -3,6 +3,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from archive.events import init_event_store
 from archive.originals import init_original_store
 from archive.receipts import init_receipt_store
 from archive.records import init_reading_store
@@ -49,3 +50,4 @@ def init_archive(db: sqlite3.Connection) -> None:
         init_receipt_store(db)
         init_reading_store(db)
         init_original_store(db)
+        init_event_store(db)
