@@ -1,0 +1,9 @@
+{
+  "primary": {"batch_id":"LOT-17","event_id":"M","source_scale":[1,10],"pages":[{"page_id":"M1","columns":["specimen_id","reading"],"rows":[["y",220],["x",200]]}]},
+  "p_full": {"batch_id":"LOT-17","event_id":"P","source_scale":[1,10],"pages":[{"page_id":"P1","columns":["specimen_id","reading"],"rows":[["x",200],["y",220]]}]},
+  "p_reordered": {"batch_id":"LOT-17","event_id":"P","source_scale":[1,1],"pages":[{"page_id":"P2","columns":["reading","specimen_id"],"rows":[[22,"y"],[20,"x"]]}]},
+  "p_x": {"batch_id":"LOT-17","event_id":"P","source_scale":[1,10],"pages":[{"page_id":"PX","columns":["specimen_id","reading"],"rows":[["x",200]]}]},
+  "p_y": {"batch_id":"LOT-17","event_id":"P","source_scale":[1,10],"pages":[{"page_id":"PY","columns":["specimen_id","reading"],"rows":[["y",220]]}]},
+  "q_x": {"batch_id":"LOT-17","event_id":"Q","source_scale":[1,1],"pages":[{"page_id":"Q1","columns":["specimen_id","reading"],"rows":[["x",20]]}]},
+  "p_conflict": {"batch_id":"LOT-17","event_id":"P","source_scale":[1,10],"pages":[{"page_id":"PC","columns":["specimen_id","reading"],"rows":[["x",210],["y",220]]}]}
+}
